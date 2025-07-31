@@ -28,6 +28,7 @@ import {
   getPythPushOracleAddress,
 } from "../pythUtils";
 import { getAccountMeta } from "../solanaUtils";
+import { validPubkey } from "../generalUtils";
 
 export function createDynamicMarginfiProgram(env?: ProgramEnv): Program {
   return {
@@ -69,15 +70,11 @@ export async function getAllBankRelatedAccounts(
   );
 
   const oracles = banksData
-    .map((bank) => {
-      const oracleKey = toWeb3JsPublicKey(bank.config.oracleKeys[0]);
-      return bank.config.oracleSetup === OracleSetup.PythPushOracle
-        ? [
-            getPythPushOracleAddress(oracleKey, PYTH_SPONSORED_SHARD_ID),
-            getPythPushOracleAddress(oracleKey, MARGINFI_SPONSORED_SHARD_ID),
-          ]
-        : [oracleKey];
-    })
+    .map((bank) =>
+      bank.config.oracleKeys
+        .map((x) => toWeb3JsPublicKey(x))
+        .filter((x) => validPubkey(x))
+    )
     .flat()
     .map((x) => x.toString());
 
@@ -118,14 +115,15 @@ export async function getMarginfiPriceOracle(
     bank.data = await fetchBank(umi, fromWeb3JsPublicKey(bank.pk!));
   }
 
-  const oracleKey = toWeb3JsPublicKey(bank.data.config.oracleKeys[0]);
   const priceOracle =
     bank.data.config.oracleSetup === OracleSetup.PythPushOracle
-      ? await getMostUpToDatePythOracle(umi, [
-          getPythPushOracleAddress(oracleKey, PYTH_SPONSORED_SHARD_ID),
-          getPythPushOracleAddress(oracleKey, MARGINFI_SPONSORED_SHARD_ID),
-        ])
-      : oracleKey;
+      ? await getMostUpToDatePythOracle(
+          umi,
+          bank.data.config.oracleKeys
+            .map((x) => toWeb3JsPublicKey(x))
+            .filter((x) => validPubkey(x))
+        )
+      : toWeb3JsPublicKey(bank.data.config.oracleKeys[0]);
 
   return priceOracle;
 }
