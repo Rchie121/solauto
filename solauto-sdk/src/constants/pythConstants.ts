@@ -6,9 +6,6 @@ export const PYTH_PUSH_PROGRAM = new PublicKey(
   "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
 );
 
-export const PYTH_SPONSORED_SHARD_ID = 0;
-export const MARGINFI_SPONSORED_SHARD_ID = 3301;
-
 // https://pyth.network/developers/price-feed-ids#solana-stable
 export const PYTH_PRICE_FEED_IDS = {
   [NATIVE_MINT.toString()]:
