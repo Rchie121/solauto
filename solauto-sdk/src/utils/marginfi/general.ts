@@ -7,9 +7,7 @@ import {
 import { ProgramEnv, MarginfiAssetAccounts } from "../../types";
 import {
   getMarginfiAccounts,
-  MARGINFI_SPONSORED_SHARD_ID,
   MarginfiBankAccountsMap,
-  PYTH_SPONSORED_SHARD_ID,
 } from "../../constants";
 import {
   Balance,
@@ -25,7 +23,6 @@ import { bytesToI80F48, fromBaseUnit, toBps } from "../numberUtils";
 import { getTokenAccountData } from "../accountUtils";
 import {
   getMostUpToDatePythOracle,
-  getPythPushOracleAddress,
 } from "../pythUtils";
 import { getAccountMeta } from "../solanaUtils";
 import { validPubkey } from "../generalUtils";

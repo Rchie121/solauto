@@ -23,15 +23,3 @@ export async function getMostUpToDatePythOracle(
 
   return oracles[0][0];
 }
-
-export function getPythPushOracleAddress(
-  feedId: PublicKey,
-  shardId: number,
-  programId: PublicKey = PYTH_PUSH_PROGRAM
-): PublicKey {
-  const shardBytes = u16ToArrayBufferLE(shardId);
-  return PublicKey.findProgramAddressSync(
-    [shardBytes, feedId.toBuffer()],
-    programId
-  )[0];
-}
