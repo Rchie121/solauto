@@ -12,7 +12,7 @@ See the [Program documentation](/programs/solauto/README.md) for more info on th
 - PNPM
 
 ```
-crate install shank-idl
+cargo install shank-cli
 rustup component add rustfmt
 pnpm install -g ts-node
 ```
