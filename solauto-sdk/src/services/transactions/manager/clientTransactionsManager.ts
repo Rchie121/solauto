@@ -6,6 +6,7 @@ import { SolautoClient } from "../../solauto";
 import { TransactionsManager } from "./transactionsManager";
 import {
   buildSwbSubmitResponseTx,
+  getSwitchboardFeedData,
   isSwitchboardMint,
   retryWithExponentialBackoff,
 } from "../../../utils";
@@ -44,20 +45,31 @@ export class ClientTransactionsManager extends TransactionsManager<SolautoClient
     ];
 
     if (txs.find((x) => x.oracleInteractor) && switchboardMints.length) {
-      this.txHandler.log("Requires oracle update(s)...");
-      const oracleTxs = switchboardMints.map(
-        (x) =>
-          new TransactionItem(
-            async () =>
-              await buildSwbSubmitResponseTx(
-                this.txHandler.connection,
-                this.txHandler.signer,
-                x
-              ),
-            this.updateOracleTxName
+        this.txHandler.log("Checking if oracle update(s) needed...");
+      const staleOracles =
+        (
+          await getSwitchboardFeedData(
+            this.txHandler.connection,
+            switchboardMints
           )
-      );
-      txs.unshift(...oracleTxs);
+        ).filter((x) => x.stale).length > 0;
+
+      if (staleOracles) {
+        this.txHandler.log("Requires oracle update(s)...");
+        const oracleTxs = switchboardMints.map(
+          (x) =>
+            new TransactionItem(
+              async () =>
+                await buildSwbSubmitResponseTx(
+                  this.txHandler.connection,
+                  this.txHandler.signer,
+                  x
+                ),
+              this.updateOracleTxName
+            )
+        );
+        txs.unshift(...oracleTxs);
+      }
     }
   }
 
@@ -111,7 +123,8 @@ export class ClientTransactionsManager extends TransactionsManager<SolautoClient
 
     const updateLut = await client.updateLookupTable();
 
-    const updateLutInSepTx = updateLut?.new || (updateLut?.accountsToAdd ?? []).length > 4;
+    const updateLutInSepTx =
+      updateLut?.new || (updateLut?.accountsToAdd ?? []).length > 4;
     if (updateLut && updateLutInSepTx) {
       await this.updateLut(updateLut.tx, updateLut.new);
     }

@@ -45,8 +45,10 @@ export async function fetchTokenPrices(
   const pythMints = newMints.filter((x) =>
     Object.keys(PYTH_PRICE_FEED_IDS).includes(x.toString())
   );
-  const switchboardMints = newMints.filter((x) =>
-    Object.keys(SWITCHBOARD_PRICE_FEED_IDS).includes(x.toString())
+  const switchboardMints = newMints.filter(
+    (x) =>
+      Object.keys(SWITCHBOARD_PRICE_FEED_IDS).includes(x.toString()) &&
+      !pythMints.map((y) => y.toString()).includes(x.toString())
   );
   const otherMints = newMints.filter(
     (x) => !pythMints.includes(x) && !switchboardMints.includes(x)
@@ -88,7 +90,9 @@ export async function getPythPrices(
 
   const getReq = async () =>
     await fetch(
-      `https://hermes.pyth.network/v2/updates/price/latest?${priceFeedIds.map((x) => `ids%5B%5D=${x}`).join("&")}`
+      `https://hermes.pyth.network/v2/updates/price/latest?${priceFeedIds
+        .map((x) => `ids%5B%5D=${x}`)
+        .join("&")}`
     );
 
   const deriveValue = (price: number, exponent: number) => {
