@@ -160,7 +160,7 @@ export async function getSwitchboardPrices(
   }
 
   const { CrossbarClient } = SwbCommon;
-  const crossbar = CrossbarClient.default();
+  const crossbar = new CrossbarClient("https://integrator-crossbar.mrgn.app/");
 
   let prices: Record<string, PriceResult> = {};
   try {
