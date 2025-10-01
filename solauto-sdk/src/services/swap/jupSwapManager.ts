@@ -47,7 +47,9 @@ export interface JupSwapTransactionData {
 }
 
 export class JupSwapManager {
-  jupApi = createJupiterApiClient();
+  jupApi = createJupiterApiClient({
+    basePath: "https://lite-api.jup.ag"
+  });
 
   public jupQuote: QuoteResponse | undefined = undefined;
 
@@ -103,7 +105,6 @@ export class JupSwapManager {
             userPublicKey: this.signer.publicKey.toString(),
             quoteResponse: this.jupQuote!,
             wrapAndUnwrapSol: data.wrapAndUnwrapSol ?? false,
-            useTokenLedger: !data.exactOut && !data.exactIn,
             destinationTokenAccount: getTokenAccount(
               data.destinationWallet ??
                 toWeb3JsPublicKey(this.signer.publicKey),
