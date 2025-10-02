@@ -209,6 +209,31 @@ export async function getAddressLookupInputs(
   }, new Array<AddressLookupTableInput>());
 }
 
+export function prependTx(
+  tx: TransactionBuilder,
+  txsToAdd: (TransactionBuilder | WrappedInstruction)[]
+) {
+  const instructions = tx.getInstructions();
+  const keccakIdx = instructions.findIndex(
+    (x) =>
+      x.programId.toString() === "KeccakSecp256k11111111111111111111111111111"
+  );
+  if (keccakIdx !== -1) {
+    const [beforeKeccak, afterKeccak] = tx.splitByIndex(keccakIdx + 1);
+    let finalTx = transactionBuilder().add(beforeKeccak);
+    for (const txToAdd of txsToAdd) {
+      finalTx = finalTx.append(txToAdd);
+    }
+    return finalTx.add(afterKeccak);
+  } else {
+    let finalTx = tx;
+    for (const txToAdd of txsToAdd) {
+      finalTx = finalTx.prepend(txToAdd);
+    }
+    return finalTx;
+  }
+}
+
 export function addTxOptimizations(
   umi: Umi,
   tx: TransactionBuilder,
@@ -227,11 +252,11 @@ export function addTxOptimizations(
   const withCuPrice = tx.prepend(computePriceIx);
   const withCuLimit = tx.prepend(computeLimitIx);
   if (allOptimizations.fitsInOneTransaction(umi)) {
-    return allOptimizations;
+    return prependTx(tx, [computePriceIx, computeLimitIx]);
   } else if (withCuPrice.fitsInOneTransaction(umi)) {
-    return withCuPrice;
+    return prependTx(tx, [computePriceIx]);
   } else if (withCuLimit.fitsInOneTransaction(umi)) {
-    return withCuLimit;
+    return prependTx(tx, [computeLimitIx]);
   } else {
     return tx;
   }

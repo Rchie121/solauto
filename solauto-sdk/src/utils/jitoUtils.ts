@@ -19,6 +19,7 @@ import { BundleSimulationError } from "../types";
 import {
   assembleFinalTransaction,
   getComputeUnitPriceEstimate,
+  prependTx,
   sendSingleOptimizedTransaction,
   systemTransferUmiIx,
 } from "./solanaUtils";
@@ -301,7 +302,7 @@ export async function sendJitoBundledTransactions(
     txs.map((x) => x.getTransactionSize(umi))
   );
 
-  txs[0] = txs[0].prepend(getTipInstruction(userSigner, 250_000));
+  txs[0] = prependTx(txs[0], [getTipInstruction(userSigner, 250_000)]);
 
   const latestBlockhash = (
     await retryWithExponentialBackoff(

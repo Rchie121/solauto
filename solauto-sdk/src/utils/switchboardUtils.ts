@@ -13,12 +13,13 @@ import switchboardIdl from "../idls/switchboard.json";
 import { PRICES, SWITCHBOARD_PRICE_FEED_IDS } from "../constants";
 import { TransactionItemInputs } from "../types";
 import {
+  consoleLog,
   currentUnixSeconds,
   retryWithExponentialBackoff,
 } from "./generalUtils";
 import { getWrappedInstruction } from "./solanaUtils";
 
-export function getPullFeed(
+export async function getPullFeed(
   conn: Connection,
   mint: PublicKey,
   wallet?: PublicKey
@@ -37,11 +38,15 @@ export function getPullFeed(
     dummyWallet,
     AnchorProvider.defaultOptions()
   );
-  const program = new Program(switchboardIdl as Idl, provider);
 
-  const { PullFeed } = OnDemand;
+  consoleLog("Pulling SWB program...");
+  const { PullFeed, ON_DEMAND_MAINNET_PID } = OnDemand;
+  const sbProgram = await Program.at(ON_DEMAND_MAINNET_PID, provider);
+
+  consoleLog("Pulled SWB program!");
+  consoleLog("Feed id:", SWITCHBOARD_PRICE_FEED_IDS[mint.toString()].feedId);
   return new PullFeed(
-    program,
+    sbProgram,
     new PublicKey(SWITCHBOARD_PRICE_FEED_IDS[mint.toString()].feedId)
   );
 }
@@ -51,10 +56,14 @@ export async function buildSwbSubmitResponseTx(
   signer: Signer,
   mint: PublicKey
 ): Promise<TransactionItemInputs | undefined> {
-  const feed = getPullFeed(conn, mint, toWeb3JsPublicKey(signer.publicKey));
-  const [pullIx, responses] = await retryWithExponentialBackoff(
+  const feed = await getPullFeed(conn, mint, toWeb3JsPublicKey(signer.publicKey));
+
+  const gateway = await feed.fetchGatewayUrl();
+  consoleLog("Fetching crank IX...");
+  const [pullIxs, responses] = await retryWithExponentialBackoff(
     async () => {
       const res = await feed.fetchUpdateIx({
+        gateway,
         chain: "solana",
         network: "mainnet-beta",
       });
@@ -67,11 +76,13 @@ export async function buildSwbSubmitResponseTx(
     200
   );
 
-  if (!pullIx) {
+  if (!pullIxs || !pullIxs.length) {
     throw new Error("Unable to fetch SWB crank IX");
   }
 
+  consoleLog("Setting price locally...");
   const price = (responses[0].value as Big).toNumber();
+  consoleLog(price);
   PRICES[mint.toString()] = {
     realtimePrice: price,
     confInterval: 0,
@@ -80,11 +91,15 @@ export async function buildSwbSubmitResponseTx(
     time: currentUnixSeconds(),
   };
 
+  consoleLog("Returning SWB transaction data...");
   return {
-    tx: transactionBuilder([getWrappedInstruction(signer, pullIx!)]),
+    tx: transactionBuilder(
+      pullIxs.map((x) => getWrappedInstruction(signer, x))
+    ),
     lookupTableAddresses: responses
       .filter((x) => Boolean(x.oracle.lut?.key))
       .map((x) => x.oracle.lut!.key.toString()),
+    orderPrio: -1,
   };
 }
 
@@ -103,7 +118,7 @@ export async function getSwitchboardFeedData(
 
   const results = await Promise.all(
     mints.map(async (mint) => {
-      const feed = getPullFeed(conn, mint);
+      const feed = await getPullFeed(conn, mint);
       const result = await feed.loadData();
       const price = Number(result.result.value) / Math.pow(10, 18);
       const stale =

@@ -68,6 +68,7 @@ export class ClientTransactionsManager extends TransactionsManager<SolautoClient
               this.updateOracleTxName
             )
         );
+        this.txHandler.log("Set crank IXs in TX");
         txs.unshift(...oracleTxs);
       }
     }
