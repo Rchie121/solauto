@@ -9,7 +9,6 @@ import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import * as OnDemand from "@switchboard-xyz/on-demand";
 import Big from "big.js";
-import switchboardIdl from "../idls/switchboard.json";
 import { PRICES, SWITCHBOARD_PRICE_FEED_IDS } from "../constants";
 import { TransactionItemInputs } from "../types";
 import {
@@ -18,6 +17,7 @@ import {
   retryWithExponentialBackoff,
 } from "./generalUtils";
 import { getWrappedInstruction } from "./solanaUtils";
+import { CrossbarClient } from "@switchboard-xyz/common";
 
 export async function getPullFeed(
   conn: Connection,
@@ -40,15 +40,22 @@ export async function getPullFeed(
   );
 
   consoleLog("Pulling SWB program...");
-  const { PullFeed, ON_DEMAND_MAINNET_PID } = OnDemand;
+  const { PullFeed, Queue, ON_DEMAND_MAINNET_PID } = OnDemand;
   const sbProgram = await Program.at(ON_DEMAND_MAINNET_PID, provider);
+
+  const crossbar = new CrossbarClient("https://integrator-crossbar.mrgn.app/");
+  const queue = await Queue.loadDefault(sbProgram);
+  const gateway = await queue.fetchGatewayFromCrossbar(crossbar as any);
 
   consoleLog("Pulled SWB program!");
   consoleLog("Feed id:", SWITCHBOARD_PRICE_FEED_IDS[mint.toString()].feedId);
-  return new PullFeed(
-    sbProgram,
-    new PublicKey(SWITCHBOARD_PRICE_FEED_IDS[mint.toString()].feedId)
-  );
+  return {
+    gateway,
+    feed: new PullFeed(
+      sbProgram,
+      new PublicKey(SWITCHBOARD_PRICE_FEED_IDS[mint.toString()].feedId)
+    ),
+  };
 }
 
 export async function buildSwbSubmitResponseTx(
@@ -56,14 +63,19 @@ export async function buildSwbSubmitResponseTx(
   signer: Signer,
   mint: PublicKey
 ): Promise<TransactionItemInputs | undefined> {
-  const feed = await getPullFeed(conn, mint, toWeb3JsPublicKey(signer.publicKey));
+  const { feed, gateway } = await getPullFeed(
+    conn,
+    mint,
+    toWeb3JsPublicKey(signer.publicKey)
+  );
 
-  const gateway = await feed.fetchGatewayUrl();
+  // Try to replicate locally in the lambda docker container
+
   consoleLog("Fetching crank IX...");
   const [pullIxs, responses] = await retryWithExponentialBackoff(
     async () => {
       const res = await feed.fetchUpdateIx({
-        gateway,
+        gateway: gateway.endpoint(),
         chain: "solana",
         network: "mainnet-beta",
       });
@@ -99,7 +111,7 @@ export async function buildSwbSubmitResponseTx(
     lookupTableAddresses: responses
       .filter((x) => Boolean(x.oracle.lut?.key))
       .map((x) => x.oracle.lut!.key.toString()),
-    orderPrio: -1,
+    orderPrio: -2,
   };
 }
 
@@ -118,7 +130,7 @@ export async function getSwitchboardFeedData(
 
   const results = await Promise.all(
     mints.map(async (mint) => {
-      const feed = await getPullFeed(conn, mint);
+      const { feed } = await getPullFeed(conn, mint);
       const result = await feed.loadData();
       const price = Number(result.result.value) / Math.pow(10, 18);
       const stale =
