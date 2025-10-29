@@ -44,6 +44,8 @@ export const PYTH_PRICE_FEED_IDS = {
     "0x4ca4beeca86f0d164160323817a4e42b10010a724c2217c6ee41b54cd4cc61fc",
   [tokens.PUMP]:
     "0x7a01fca212788bba7c5bf8c9efd576a8a722f070d2c17596ff7bb609b8d5c3b9",
+  [tokens.CBBTC]:
+    "0x2817d7bfe5c64b8ea956e9a26f573ef64e72e4d7891f2d6af9bcc93f7aff9a97",
 };
 
 export const PYTH_ORACLE_ACCOUNTS = {

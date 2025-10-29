@@ -65,3 +65,5 @@ export const STANDARD_LUT_ACCOUNTS = [
   SYSVAR_INSTRUCTIONS_PUBKEY,
   JUPITER_PROGRAM_ID,
 ].map((x) => x.toString());
+
+export const UPDATE_ORACLE_TX_NAME = "update oracle";

@@ -25,6 +25,7 @@ export const RETARDIO = "6ogzHhzdrQr9Pgv6hZ2MNze7UrzBMAFyBBWUYp1Fhitx";
 export const BILLY = "3B5wuUrMEi5yATD7on46hKfej3pfmd7t1RKgrsN3pump";
 export const HMTR = "7JhmUcZrrfhyt5nTSu3AfsrUq2L9992a7AhwdSDxdoL2";
 export const PUMP = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
+export const CBBTC = "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij";
 
 export const ALL_SUPPORTED_TOKENS = [
   NATIVE_MINT.toString(),
@@ -51,6 +52,7 @@ export const ALL_SUPPORTED_TOKENS = [
   BILLY,
   HMTR,
   PUMP,
+  CBBTC,
 ];
 
 export interface TokenInfo {
@@ -199,11 +201,18 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
     ticker: "PUMP",
     name: "Pump.fun",
     decimals: 6,
-  }
+  },
+  [CBBTC]: {
+    ticker: "CBBTC",
+    name: "Coinbase BTC",
+    decimals: 8,
+    isMajor: true,
+  },
 };
 
 export const MAJORS_PRIO = {
   [WBTC]: 0,
+  [CBBTC]: 0,
   [WETH]: 1,
   [NATIVE_MINT.toString()]: 2,
 };

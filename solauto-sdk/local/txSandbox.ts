@@ -4,6 +4,7 @@ import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 import {
   ClientTransactionsManager,
   consoleLog,
+  fetchBank,
   getBatches,
   getClient,
   getPositionExBulk,
@@ -15,6 +16,8 @@ import {
   PriorityFeeSetting,
   ProgramEnv,
   rebalance,
+  safeFetchBank,
+  safeFetchMarginfiAccount,
   SOLAUTO_PROD_PROGRAM,
   SOLAUTO_TEST_PROGRAM,
   SolautoClient,
@@ -46,24 +49,30 @@ export async function main() {
     lpEnv,
   });
 
-  await client.initializeExistingSolautoPosition({
-    positionId: 1,
-    authority: new PublicKey("61rtn5tzVkesapo6Cz83SPoShUfAePSxJsqniuF2wRKC"),
-    // lpUserAccount: new PublicKey(
-    //   "GEokw9jqbh6d1xUNA3qaeYFFetbSR5Y1nt7C3chwwgSz"
-    // ),
-  });
+  // await client.initializeExistingSolautoPosition({
+  //   positionId: 1,
+  //   authority: new PublicKey("61rtn5tzVkesapo6Cz83SPoShUfAePSxJsqniuF2wRKC"),
+  //   // lpUserAccount: new PublicKey(
+  //   //   "GEokw9jqbh6d1xUNA3qaeYFFetbSR5Y1nt7C3chwwgSz"
+  //   // ),
+  // });
 
-  const transactionItems = [rebalance(client)];
+  // const transactionItems = [rebalance(client)];
 
-  const txManager = new ClientTransactionsManager({
-    txHandler: client,
-    txRunType: payForTransaction ? "normal" : "only-simulate",
-    priorityFeeSetting: PriorityFeeSetting.Default,
-    retryConfig: { totalRetries: 2 },
-  });
-  const statuses = await txManager.send(transactionItems);
-  consoleLog(statuses);
+  const account = await fetchBank(umi, publicKey("Ac4KV5K5isDqtABtg6h5DiwzZMe3Sp9bc3pBiCUvUpaQ"));
+  console.log(account.config.oracleKeys[0]);
+  console.log(account.config.oracleKeys[1]);
+  console.log(account.config.oracleKeys[2]);
+  console.log(account.config.oracleKeys[3]);
+
+  // const txManager = new ClientTransactionsManager({
+  //   txHandler: client,
+  //   txRunType: payForTransaction ? "normal" : "only-simulate",
+  //   priorityFeeSetting: PriorityFeeSetting.Default,
+  //   retryConfig: { totalRetries: 2 },
+  // });
+  // const statuses = await txManager.send(transactionItems);
+  // consoleLog(statuses);
 }
 
 async function refreshAll() {

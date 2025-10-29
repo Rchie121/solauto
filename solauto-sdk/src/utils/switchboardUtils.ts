@@ -9,7 +9,11 @@ import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import * as OnDemand from "@switchboard-xyz/on-demand";
 import Big from "big.js";
-import { PRICES, SWITCHBOARD_PRICE_FEED_IDS } from "../constants";
+import {
+  PRICES,
+  SWITCHBOARD_PRICE_FEED_IDS,
+  UPDATE_ORACLE_TX_NAME,
+} from "../constants";
 import { TransactionItemInputs } from "../types";
 import {
   consoleLog,
@@ -18,6 +22,7 @@ import {
 } from "./generalUtils";
 import { getWrappedInstruction } from "./solanaUtils";
 import { CrossbarClient } from "@switchboard-xyz/common";
+import { SolautoClient, TransactionItem } from "../services";
 
 export async function getPullFeed(
   conn: Connection,
@@ -68,8 +73,6 @@ export async function buildSwbSubmitResponseTx(
     mint,
     toWeb3JsPublicKey(signer.publicKey)
   );
-
-  // Try to replicate locally in the lambda docker container
 
   consoleLog("Fetching crank IX...");
   const [pullIxs, responses] = await retryWithExponentialBackoff(
@@ -145,4 +148,42 @@ export async function getSwitchboardFeedData(
 
 export function isSwitchboardMint(mint: PublicKey | string) {
   return Object.keys(SWITCHBOARD_PRICE_FEED_IDS).includes(mint.toString());
+}
+
+export async function addSwbOraclePullTxs(
+  client: SolautoClient,
+  txs: TransactionItem[]
+) {
+  const switchboardMints = [
+    ...(isSwitchboardMint(client.pos.supplyMint)
+      ? [client.pos.supplyMint]
+      : []),
+    ...(isSwitchboardMint(client.pos.debtMint) ? [client.pos.debtMint] : []),
+  ];
+
+  if (txs.find((x) => x.oracleInteractor) && switchboardMints.length) {
+    consoleLog("Checking if oracle update(s) needed...");
+    const staleOracles =
+      (
+        await getSwitchboardFeedData(client.connection, switchboardMints)
+      ).filter((x) => x.stale).length > 0;
+
+    if (staleOracles) {
+      consoleLog("Requires oracle update(s)...");
+      const oracleTxs = switchboardMints.map(
+        (x) =>
+          new TransactionItem(
+            async () =>
+              await buildSwbSubmitResponseTx(
+                client.connection,
+                client.signer,
+                x
+              ),
+            UPDATE_ORACLE_TX_NAME
+          )
+      );
+      consoleLog("Set crank IXs in TX");
+      txs.unshift(...oracleTxs);
+    }
+  }
 }

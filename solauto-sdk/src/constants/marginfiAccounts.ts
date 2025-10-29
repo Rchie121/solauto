@@ -142,6 +142,11 @@ const MARGINFI_PROD_ACCOUNTS: MarginfiBankAccountsMap = {
       bank: "61Qx9kgWo9RVtPHf8Rku6gbaUtcnzgkpAuifQBUcMRVK",
       liquidityVault: "6FxnrCaJNHLyrFy6EPtqFjoUK5iRxDQbaVo1bA69nDhH",
       vaultAuthority: "6VL2QW6sy8cjxL24xHL7eFbnUSi35DMJd8AzRwssSs9y"
+    },
+    [tokens.CBBTC]: {
+      bank: "Ac4KV5K5isDqtABtg6h5DiwzZMe3Sp9bc3pBiCUvUpaQ",
+      liquidityVault: "FvrJsHu7X9jkT9rTuR6Kfs6wSjPvjV6zhH4gVSiJ8LFT",
+      vaultAuthority: "jfBsYE2sAkNj1pwE6U1gQ515JU5vn9huZMDYVvZagb4",
     }
   },
   ["DQ2jqDJw9uzTwttf6h6r217BQ7kws3jZbJXDkfbCJa1q"]: {

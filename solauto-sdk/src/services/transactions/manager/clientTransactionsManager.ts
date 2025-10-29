@@ -5,6 +5,7 @@ import {
 import { SolautoClient } from "../../solauto";
 import { TransactionsManager } from "./transactionsManager";
 import {
+  addSwbOraclePullTxs,
   buildSwbSubmitResponseTx,
   getSwitchboardFeedData,
   isSwitchboardMint,
@@ -32,46 +33,6 @@ export class ClientTransactionsManager extends TransactionsManager<SolautoClient
       this.errorsToThrow
     );
     await this.txHandler.refetchReferralState();
-  }
-
-  private async addSwbOraclePullTxs(txs: TransactionItem[]) {
-    const switchboardMints = [
-      ...(isSwitchboardMint(this.txHandler.pos.supplyMint)
-        ? [this.txHandler.pos.supplyMint]
-        : []),
-      ...(isSwitchboardMint(this.txHandler.pos.debtMint)
-        ? [this.txHandler.pos.debtMint]
-        : []),
-    ];
-
-    if (txs.find((x) => x.oracleInteractor) && switchboardMints.length) {
-        this.txHandler.log("Checking if oracle update(s) needed...");
-      const staleOracles =
-        (
-          await getSwitchboardFeedData(
-            this.txHandler.connection,
-            switchboardMints
-          )
-        ).filter((x) => x.stale).length > 0;
-
-      if (staleOracles) {
-        this.txHandler.log("Requires oracle update(s)...");
-        const oracleTxs = switchboardMints.map(
-          (x) =>
-            new TransactionItem(
-              async () =>
-                await buildSwbSubmitResponseTx(
-                  this.txHandler.connection,
-                  this.txHandler.signer,
-                  x
-                ),
-              this.updateOracleTxName
-            )
-        );
-        this.txHandler.log("Set crank IXs in TX");
-        txs.unshift(...oracleTxs);
-      }
-    }
   }
 
   private async addChoreTxs(
@@ -131,7 +92,7 @@ export class ClientTransactionsManager extends TransactionsManager<SolautoClient
     }
     this.lookupTables.defaultLuts = client.defaultLookupTables();
 
-    await this.addSwbOraclePullTxs(items);
+    // await addSwbOraclePullTxs(this.txHandler, items);
 
     for (const item of items) {
       await item.initialize();

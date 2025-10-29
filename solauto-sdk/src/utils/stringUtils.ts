@@ -9,7 +9,7 @@ export type StrategyType = (typeof StrategyTypes)[number];
 export function adjustedTicker(mint?: PublicKey) {
   const info = tokenInfo(mint);
 
-  if (info.ticker.toLowerCase() === "wbtc") {
+  if (info.ticker.toLowerCase().includes("btc")) {
     return "BTC";
   } else if (info.ticker.toLowerCase() === "weth") {
     return "ETH";

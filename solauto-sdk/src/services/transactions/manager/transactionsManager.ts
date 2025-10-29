@@ -16,6 +16,7 @@ import {
 import { TxHandler } from "../../solauto";
 import { getErrorInfo } from "../transactionUtils";
 import { LookupTables, TransactionItem, TransactionSet } from "../types";
+import { UPDATE_ORACLE_TX_NAME } from "../../../constants";
 
 export class TransactionTooLargeError extends Error {
   constructor(message: string) {
@@ -75,8 +76,6 @@ export class TransactionsManager<T extends TxHandler> {
   protected retryDelay: number;
   protected abortController?: AbortController;
 
-  updateOracleTxName = "update oracle";
-
   constructor(args: TransactionsManagerArgs<T>) {
     this.txHandler = args.txHandler;
     this.statusCallback = args.statusCallback;
@@ -118,7 +117,9 @@ export class TransactionsManager<T extends TxHandler> {
       );
       if (!transaction.fitsInOneTransaction(this.txHandler.umi)) {
         throw new TransactionTooLargeError(
-          `Exceeds max transaction size (${transaction.getTransactionSize(this.txHandler.umi)})`
+          `Exceeds max transaction size (${transaction.getTransactionSize(
+            this.txHandler.umi
+          )})`
         );
       } else {
         let newSet = new TransactionSet(this.txHandler, this.lookupTables, [
@@ -166,7 +167,9 @@ export class TransactionsManager<T extends TxHandler> {
       }
     }
     consoleLog(
-      `${args.name} ${args.attemptNum} is ${args.status.toString().toLowerCase()}`
+      `${args.name} ${args.attemptNum} is ${args.status
+        .toString()
+        .toLowerCase()}`
     );
     this.statusCallback?.([...this.statuses]);
   }
@@ -180,7 +183,11 @@ export class TransactionsManager<T extends TxHandler> {
         (x) => !lutAccounts.includes(x)
       );
       consoleLog(
-        `Program ${ix.programId}, data len: ${ix.data.length}, LUT accounts data: ${ix.keys.filter((x) => lutAccounts.includes(x.pubkey)).length * 3}`
+        `Program ${ix.programId}, data len: ${
+          ix.data.length
+        }, LUT accounts data: ${
+          ix.keys.filter((x) => lutAccounts.includes(x.pubkey)).length * 3
+        }`
       );
       if (accountsNotInLut.length > 0) {
         consoleLog(`${accountsNotInLut.length} accounts not in LUT:`);
@@ -273,7 +280,7 @@ export class TransactionsManager<T extends TxHandler> {
     );
     if (
       newItemSetNames.length === 1 &&
-      newItemSetNames[0] === this.updateOracleTxName
+      newItemSetNames[0] === UPDATE_ORACLE_TX_NAME
     ) {
       consoleLog("Skipping unnecessary oracle update");
       this.updateStatusForSets(
@@ -570,7 +577,9 @@ export class TransactionsManager<T extends TxHandler> {
       this.priorityFeeSetting
     );
 
-    const errorString = `${errorDetails.errorName ?? "Unknown error"}: ${errorDetails.errorInfo?.split("\n")[0] ?? "unknown"}`;
+    const errorString = `${errorDetails.errorName ?? "Unknown error"}: ${
+      errorDetails.errorInfo?.split("\n")[0] ?? "unknown"
+    }`;
     const errorInfo =
       errorDetails.errorName || errorDetails.errorInfo
         ? errorString
