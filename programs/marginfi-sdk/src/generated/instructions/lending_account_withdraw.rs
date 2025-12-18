@@ -41,7 +41,7 @@ impl LendingAccountWithdraw {
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
             self.marginfi_group,
             false,
         ));
@@ -111,7 +111,7 @@ pub struct LendingAccountWithdrawInstructionArgs {
 ///
 /// ### Accounts:
 ///
-///   0. `[]` marginfi_group
+///   0. `[writable]` marginfi_group
 ///   1. `[writable]` marginfi_account
 ///   2. `[signer]` signer
 ///   3. `[writable]` bank
@@ -345,7 +345,7 @@ impl<'a, 'b> LendingAccountWithdrawCpi<'a, 'b> {
         )],
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
             *self.marginfi_group.key,
             false,
         ));
@@ -421,7 +421,7 @@ impl<'a, 'b> LendingAccountWithdrawCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[]` marginfi_group
+///   0. `[writable]` marginfi_group
 ///   1. `[writable]` marginfi_account
 ///   2. `[signer]` signer
 ///   3. `[writable]` bank
