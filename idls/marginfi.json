@@ -883,7 +883,7 @@
       "accounts": [
         {
           "name": "marginfiGroup",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
