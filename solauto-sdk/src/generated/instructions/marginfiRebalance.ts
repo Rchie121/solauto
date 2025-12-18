@@ -188,7 +188,7 @@ export function marginfiRebalance(
     },
     marginfiGroup: {
       index: 10,
-      isWritable: false as boolean,
+      isWritable: true as boolean,
       value: input.marginfiGroup ?? null,
     },
     marginfiAccount: {
