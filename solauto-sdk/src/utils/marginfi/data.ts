@@ -288,9 +288,9 @@ async function getTokenUsage(
     },
     baseAmountMarketPriceUsd: toBaseUnit(marketPrice, USD_DECIMALS),
     borrowFeeBps: isAsset ? 0 : toBps(originationFee),
-    padding1: [],
-    padding2: [],
-    padding: new Uint8Array([]),
+    padding1: new Array(5).fill(0),
+    padding2: new Array(8).fill(0),
+    padding: new Uint8Array(32),
   };
 }
 
@@ -513,9 +513,9 @@ export async function getMarginfiAccountPositionState(
       maxLtvBps,
       liqThresholdBps,
       lastRefreshed: BigInt(currentUnixSeconds()),
-      padding1: [],
-      padding2: [],
-      padding: [],
+      padding1: new Array(6).fill(0),
+      padding2: new Array(4).fill(0),
+      padding: new Array(2).fill(0),
     },
   };
 }

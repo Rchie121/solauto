@@ -7,15 +7,23 @@ import {
   TransactionRunType,
 } from "../../../types";
 import {
+  addTxOptimizations,
+  canSerializeTransaction,
   consoleLog,
   ErrorsToThrow,
+  getActualTxSize,
   retryWithExponentialBackoff,
   sendSingleOptimizedTransaction,
   sendJitoBundledTransactions,
 } from "../../../utils";
 import { TxHandler } from "../../solauto";
 import { getErrorInfo } from "../transactionUtils";
-import { LookupTables, TransactionItem, TransactionSet } from "../types";
+import {
+  JITO_TIP_BUFFER_BYTES,
+  LookupTables,
+  TransactionItem,
+  TransactionSet,
+} from "../types";
 import { UPDATE_ORACLE_TX_NAME } from "../../../constants";
 
 export class TransactionTooLargeError extends Error {
@@ -112,14 +120,25 @@ export class TransactionsManager<T extends TxHandler> {
         continue;
       }
 
-      const transaction = item.tx.setAddressLookupTables(
+      const transaction = addTxOptimizations(
+        this.txHandler.umi,
+        item.tx,
+        1,
+        1
+      ).setAddressLookupTables(
         await this.lookupTables.getLutInputs(item.lookupTableAddresses)
       );
-      if (!transaction.fitsInOneTransaction(this.txHandler.umi)) {
+      // Check if transaction can be serialized with buffer for Jito tip instruction
+      if (
+        !canSerializeTransaction(
+          this.txHandler.umi,
+          transaction,
+          JITO_TIP_BUFFER_BYTES
+        )
+      ) {
+        const actualSize = getActualTxSize(this.txHandler.umi, transaction);
         throw new TransactionTooLargeError(
-          `Exceeds max transaction size (${transaction.getTransactionSize(
-            this.txHandler.umi
-          )})`
+          `Exceeds max transaction size (actual: ${actualSize ?? "failed to serialize"} + ~${JITO_TIP_BUFFER_BYTES} bytes for Jito tip)`
         );
       } else {
         let newSet = new TransactionSet(this.txHandler, this.lookupTables, [

@@ -2,14 +2,19 @@ import {
   AddressLookupTableInput,
   transactionBuilder,
   TransactionBuilder,
+  Umi,
 } from "@metaplex-foundation/umi";
 import { TxHandler } from "../../solauto";
 import { LookupTables } from "./lookupTables";
 import { TransactionItem } from "./transactionItem";
-import { addTxOptimizations } from "../../../utils";
+import { addTxOptimizations, canSerializeTransaction } from "../../../utils";
 import { CHORES_TX_NAME } from "../../../constants";
 
 const MAX_SUPPORTED_ACCOUNT_LOCKS = 64;
+
+// Buffer for Jito tip instruction (~44 bytes) + potential new accounts in message
+// This accounts for: System Transfer instruction data, Jito tip account (if new), etc.
+export const JITO_TIP_BUFFER_BYTES = 75;
 
 export class TransactionSet {
   constructor(
@@ -55,7 +60,12 @@ export class TransactionSet {
         ])
       );
 
-    return tx.fitsInOneTransaction(this.txHandler.umi);
+    // Use actual serialization check with buffer for Jito tip instruction
+    return canSerializeTransaction(
+      this.txHandler.umi,
+      tx,
+      JITO_TIP_BUFFER_BYTES
+    );
   }
 
   add(...items: TransactionItem[]) {

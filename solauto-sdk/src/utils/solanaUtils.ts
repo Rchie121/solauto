@@ -220,7 +220,11 @@ export function prependTx(
   );
   if (keccakIdx !== -1) {
     const [beforeKeccak, afterKeccak] = tx.splitByIndex(keccakIdx + 1);
-    let finalTx = transactionBuilder().add(beforeKeccak);
+    // IMPORTANT: Preserve lookup tables from original transaction
+    const lookupTables = tx.options.addressLookupTables ?? [];
+    let finalTx = transactionBuilder()
+      .setAddressLookupTables(lookupTables)
+      .add(beforeKeccak);
     for (const txToAdd of txsToAdd) {
       finalTx = finalTx.append(txToAdd);
     }
@@ -232,6 +236,50 @@ export function prependTx(
     }
     return finalTx;
   }
+}
+
+const MAX_TX_SIZE = 1232;
+
+// Dummy blockhash for size checking (all zeros, 32 bytes base58 encoded)
+const DUMMY_BLOCKHASH = "11111111111111111111111111111111";
+
+/**
+ * Safely checks if a transaction can be serialized and returns its actual size.
+ * Returns undefined if serialization fails.
+ */
+export function getActualTxSize(
+  umi: Umi,
+  tx: TransactionBuilder
+): number | undefined {
+  try {
+    // Set a dummy blockhash if not already set, just for size checking
+    const txWithBlockhash = tx.setBlockhash(DUMMY_BLOCKHASH);
+    // Build the transaction and convert to web3.js format
+    const builtTx = txWithBlockhash.build(umi);
+    const web3Tx = toWeb3JsTransaction(builtTx);
+    // Actually serialize to get the real size
+    const serialized = web3Tx.serialize();
+    return serialized.length;
+  } catch (e) {
+    // Serialization failed - transaction is too large or malformed
+    return undefined;
+  }
+}
+
+/**
+ * Checks if a transaction can fit in a single transaction by actually serializing it.
+ * More accurate than getTransactionSize() estimation.
+ */
+export function canSerializeTransaction(
+  umi: Umi,
+  tx: TransactionBuilder,
+  buffer: number = 0
+): boolean {
+  const size = getActualTxSize(umi, tx);
+  if (size === undefined) {
+    return false;
+  }
+  return size + buffer <= MAX_TX_SIZE;
 }
 
 export function addTxOptimizations(
@@ -251,11 +299,13 @@ export function addTxOptimizations(
   const allOptimizations = tx.prepend(computePriceIx).prepend(computeLimitIx);
   const withCuPrice = tx.prepend(computePriceIx);
   const withCuLimit = tx.prepend(computeLimitIx);
-  if (allOptimizations.fitsInOneTransaction(umi)) {
+
+  // Use actual serialization check instead of estimate
+  if (canSerializeTransaction(umi, allOptimizations)) {
     return prependTx(tx, [computePriceIx, computeLimitIx]);
-  } else if (withCuPrice.fitsInOneTransaction(umi)) {
+  } else if (canSerializeTransaction(umi, withCuPrice)) {
     return prependTx(tx, [computePriceIx]);
-  } else if (withCuLimit.fitsInOneTransaction(umi)) {
+  } else if (canSerializeTransaction(umi, withCuLimit)) {
     return prependTx(tx, [computeLimitIx]);
   } else {
     return tx;

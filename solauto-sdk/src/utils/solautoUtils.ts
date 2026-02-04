@@ -403,12 +403,12 @@ export class ContextUpdates {
           ...dca.automation,
           intervalSeconds: BigInt(dca.automation.intervalSeconds),
           unixStartDate: BigInt(dca.automation.unixStartDate),
-          padding: new Uint8Array([]),
-          padding1: [],
+          padding: new Uint8Array(32),
+          padding1: new Array(4).fill(0),
         },
         dcaInBaseUnit: BigInt(dca.dcaInBaseUnit),
         tokenType: dca.tokenType,
-        padding: [],
+        padding: new Array(31).fill(0),
       };
     } else if (update.type === "cancellingDca") {
       this.cancellingDca = update.value;

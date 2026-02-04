@@ -38,7 +38,7 @@ export function createSolautoSettings(
     boostToBps: settings.boostToBps,
     repayGap: settings.repayGap,
     repayToBps: settings.repayToBps,
-    padding: [],
+    padding: new Array(24).fill(0),
   };
 }
 
@@ -167,9 +167,9 @@ export function createFakePositionState(
       borrowFeeBps: 0,
       decimals: supplyDecimals,
       mint: fromWeb3JsPublicKey(supply.mint),
-      padding1: [],
-      padding2: [],
-      padding: new Uint8Array([]),
+      padding1: new Array(5).fill(0),
+      padding2: new Array(8).fill(0),
+      padding: new Uint8Array(32),
     },
     debt: {
       amountUsed: {
@@ -186,9 +186,9 @@ export function createFakePositionState(
       borrowFeeBps: 0,
       decimals: debtDecimals,
       mint: fromWeb3JsPublicKey(debt.mint),
-      padding1: [],
-      padding2: [],
-      padding: new Uint8Array([]),
+      padding1: new Array(5).fill(0),
+      padding2: new Array(8).fill(0),
+      padding: new Uint8Array(32),
     },
     netWorth: {
       baseUnit: supply.price
@@ -199,8 +199,8 @@ export function createFakePositionState(
     maxLtvBps,
     liqThresholdBps,
     lastRefreshed: BigInt(currentUnixSeconds()),
-    padding1: [],
-    padding2: [],
-    padding: [],
+    padding1: new Array(6).fill(0),
+    padding2: new Array(4).fill(0),
+    padding: new Array(2).fill(0),
   };
 }

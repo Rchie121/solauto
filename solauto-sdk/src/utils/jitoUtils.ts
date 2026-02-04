@@ -82,8 +82,8 @@ async function simulateJitoBundle(umi: Umi, txs: VersionedTransaction[]) {
       {
         encoding: "base64",
         commitment: "confirmed",
-        preExecutionAccountsConfigs: txs.map((_) => {}),
-        postExecutionAccountsConfigs: txs.map((_) => {}),
+        preExecutionAccountsConfigs: txs.map((_) => { }),
+        postExecutionAccountsConfigs: txs.map((_) => { }),
         skipSigVerify: true,
       },
     ]);
@@ -334,16 +334,16 @@ export async function sendJitoBundledTransactions(
 
   const feeEstimates = usePriorityFee(priorityFeeSetting)
     ? await Promise.all(
-        txs.map(
-          async (x) =>
-            (await getComputeUnitPriceEstimate(
-              umi,
-              x,
-              priorityFeeSetting,
-              true
-            )) ?? 1000000
-        )
+      txs.map(
+        async (x) =>
+          (await getComputeUnitPriceEstimate(
+            umi,
+            x,
+            priorityFeeSetting,
+            true
+          )) ?? 1000000
       )
+    )
     : undefined;
 
   if (abortController?.signal.aborted) {

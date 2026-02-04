@@ -5,10 +5,6 @@ import {
 import { SolautoClient } from "../../solauto";
 import { TransactionsManager } from "./transactionsManager";
 import {
-  addSwbOraclePullTxs,
-  buildSwbSubmitResponseTx,
-  getSwitchboardFeedData,
-  isSwitchboardMint,
   retryWithExponentialBackoff,
 } from "../../../utils";
 import { TransactionItem } from "../types";
