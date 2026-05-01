@@ -95,6 +95,27 @@ export async function buildSwbSubmitResponseTx(
     throw new Error("Unable to fetch SWB crank IX");
   }
 
+  consoleLog("SWB pullIxs count:", pullIxs.length);
+  pullIxs.forEach((ix, i) => {
+    consoleLog(`SWB pullIx[${i}] programId: ${ix.programId.toString()}`);
+    consoleLog(`SWB pullIx[${i}] data length: ${ix.data.length}`);
+    consoleLog(`SWB pullIx[${i}] keys count: ${ix.keys.length}`);
+    if (ix.data.length > 0) {
+      consoleLog(
+        `SWB pullIx[${i}] data (first 128 bytes hex): ${Buffer.from(ix.data.slice(0, 128)).toString("hex")}`
+      );
+    }
+  });
+  consoleLog("SWB oracle responses:", responses.length);
+  consoleLog(
+    "SWB oracle response details:",
+    responses.map((r) => ({
+      value: r.value?.toString(),
+      error: r.error,
+      oracle: r.oracle.pubkey.toString(),
+    }))
+  );
+
   consoleLog("Setting price locally...");
   const price = (responses[0].value as Big).toNumber();
   consoleLog(price);

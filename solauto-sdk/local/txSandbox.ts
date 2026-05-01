@@ -1,7 +1,8 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { createSignerFromKeypair, publicKey } from "@metaplex-foundation/umi";
+import { createSignerFromKeypair, publicKey, signerIdentity } from "@metaplex-foundation/umi";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 import {
+  buildSwbSubmitResponseTx,
   ClientTransactionsManager,
   consoleLog,
   fetchBank,
@@ -10,6 +11,7 @@ import {
   getPositionExBulk,
   getSolanaRpcConnection,
   getSolautoManagedPositions,
+  JITO_SOL,
   LendingPlatform,
   LOCAL_IRONFORGE_API_URL,
   PriceType,
@@ -18,6 +20,7 @@ import {
   rebalance,
   safeFetchBank,
   safeFetchMarginfiAccount,
+  sendSingleOptimizedTransaction,
   SOLAUTO_PROD_PROGRAM,
   SOLAUTO_TEST_PROGRAM,
   SolautoClient,
@@ -115,5 +118,45 @@ async function refreshAll() {
   }
 }
 
-main();
+async function testSwbOracleUpdate() {
+  (globalThis as any).SHOW_LOGS = true;
+
+  let [conn, umiLocal] = getSolanaRpcConnection(
+    LOCAL_IRONFORGE_API_URL,
+    testProgram ? SOLAUTO_TEST_PROGRAM : SOLAUTO_PROD_PROGRAM,
+    lpEnv
+  );
+  umiLocal = umiLocal.use(signerIdentity(signer));
+
+  const mint = new PublicKey(JITO_SOL);
+  console.log("Building SWB oracle update tx for JitoSOL...");
+
+  const result = await buildSwbSubmitResponseTx(conn, signer, mint);
+  if (!result) {
+    console.log("No oracle update needed");
+    return;
+  }
+
+  console.log("Instructions count:", result.tx.getInstructions().length);
+  console.log("Lookup tables:", result.lookupTableAddresses);
+
+  console.log("Sending transaction...");
+  const sig = await sendSingleOptimizedTransaction(
+    umiLocal,
+    conn,
+    result.tx,
+    payForTransaction ? "normal" : "only-simulate",
+    PriorityFeeSetting.Default
+  );
+
+  if (sig) {
+    const bs58 = await import("bs58");
+    console.log("Transaction signature:", bs58.default.encode(sig));
+  } else {
+    console.log("Transaction simulation complete (no sig returned)");
+  }
+}
+
+// main();
 // refreshAll();
+testSwbOracleUpdate();

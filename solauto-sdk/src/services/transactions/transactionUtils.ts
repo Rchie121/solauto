@@ -674,6 +674,23 @@ export function getErrorInfo(
     consoleLog("Error instruction index:", errIxIdx);
     consoleLog("Error code:", errCode);
     consoleLog("Error instruction program:", errIx?.programId.toString());
+    if (errIx) {
+      consoleLog("Error ix data length:", errIx.data.length);
+      consoleLog("Error ix num keys:", errIx.keys.length);
+      consoleLog(
+        "Error ix data (first 64 bytes hex):",
+        Buffer.from(errIx.data.slice(0, 64)).toString("hex")
+      );
+    }
+    consoleLog(
+      "All ixs in failing tx:",
+      txs[errTxIdx]
+        ?.getInstructions()
+        .map(
+          (ix, i) =>
+            `[${i}] ${ix.programId.toString()} (data: ${ix.data.length}B, keys: ${ix.keys.length})`
+        )
+    );
 
     const solautoError = getSolautoErrorFromCode(
       errCode ?? -1,
