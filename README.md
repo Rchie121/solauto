@@ -1,5 +1,5 @@
 # Solauto
-
+All rights reserved @RichardPatterson
 ## Overview
 
 Solauto is a program on the Solana blockchain that lets you manage leveraged longs & shorts on auto-pilot to maximize your gains and eliminate the risk of liquidation.
