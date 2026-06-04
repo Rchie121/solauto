@@ -1,0 +1,25 @@
+import { PublicKey } from "@solana/web3.js";
+import { publicKey, Umi } from "@metaplex-foundation/umi";
+import { PYTH_PUSH_PROGRAM } from "../constants";
+import { u16ToArrayBufferLE, zip } from "./generalUtils";
+import { safeFetchAllPriceUpdateV2Account } from "../externalSdks/pyth";
+
+export async function getMostUpToDatePythOracle(
+  umi: Umi,
+  oracleKeys: PublicKey[]
+) {
+  const oracles = zip(
+    oracleKeys,
+    await safeFetchAllPriceUpdateV2Account(
+      umi,
+      oracleKeys.map((x) => publicKey(x)),
+      { commitment: "confirmed" }
+    )
+  ).sort(
+    (a, b) =>
+      Number(b[1]?.priceMessage.publishTime ?? 0) -
+      Number(a[1]?.priceMessage.publishTime ?? 0)
+  );
+
+  return oracles[0][0];
+}

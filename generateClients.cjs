@@ -28,6 +28,49 @@ function fixAnchorIDL(idlFilename, programId) {
     origin: "anchor",
     address: programId,
   };
+
+  function flattenDefined(data) {
+    if (typeof data === "object" && data !== null) {
+      if (Array.isArray(data)) {
+        return data.map(flattenDefined);
+      } else if (data.defined && typeof data.defined === "object") {
+        return { ...data, defined: data.defined.name };
+      } else {
+        return Object.keys(data).reduce((acc, key) => {
+          acc[key] = flattenDefined(data[key]);
+          return acc;
+        }, {});
+      }
+    }
+    return data;
+  }
+
+  data = flattenDefined(data);
+
+  function replacePubkeyWithPublicKey(data) {
+    if (typeof data === "object" && data !== null) {
+      if (Array.isArray(data)) {
+        return data.map(replacePubkeyWithPublicKey);
+      } else {
+        return Object.keys(data).reduce((acc, key) => {
+          if (key === "pubkey") {
+            acc["publicKey"] = data[key];
+          } else if (typeof data[key] === "string" && data[key] === "pubkey") {
+            acc[key] = "publicKey";
+          } else {
+            acc[key] = replacePubkeyWithPublicKey(data[key]);
+          }
+          return acc;
+        }, {});
+      }
+    } else if (data === "pubkey") {
+      return "publicKey";
+    }
+    return data;
+  }
+
+  data = replacePubkeyWithPublicKey(data);
+
   fs.writeFileSync(idlFilePath, JSON.stringify(data, null, 2), "utf8");
 }
 
@@ -50,7 +93,9 @@ function generateTypescriptSDKForAnchorIDL(sdkDirName, idlFilename, programId) {
   const kinobi = k.createFromIdls([idlFilePath]);
 
   kinobi.accept(
-    new k.renderJavaScriptVisitor(path.join(typescriptSdkDir, sdkDirName))
+    new k.renderJavaScriptVisitor(
+      path.join(typescriptSdkDir, "externalSdks", sdkDirName)
+    )
   );
 }
 
@@ -92,16 +137,16 @@ async function cleanJupiterTsSDK(exclusions = []) {
 
 generateSolautoSDK();
 
-// generateRustSDKForAnchorIDL(
-//   "marginfi-sdk",
-//   "marginfi.json",
-//   "MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FZnsebVacA"
-// );
-// generateTypescriptSDKForAnchorIDL(
-//   "marginfi-sdk",
-//   "marginfi.json",
-//   "MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FZnsebVacA"
-// );
+generateRustSDKForAnchorIDL(
+  "marginfi-sdk",
+  "marginfi.json",
+  "MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FZnsebVacA"
+);
+generateTypescriptSDKForAnchorIDL(
+  "marginfi",
+  "marginfi.json",
+  "MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FZnsebVacA"
+);
 
 // generateRustSDKForAnchorIDL(
 //   "jupiter-sdk",
@@ -109,8 +154,13 @@ generateSolautoSDK();
 //   "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
 // );
 // generateTypescriptSDKForAnchorIDL(
-//   "jupiter-sdk",
+//   "jupiter",
 //   "jupiter.json",
 //   "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+// );
+// generateTypescriptSDKForAnchorIDL(
+//   "pyth",
+//   "pyth.json",
+//   "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
 // );
 // cleanJupiterTsSDK(["programs", "errors", "index.ts"]);

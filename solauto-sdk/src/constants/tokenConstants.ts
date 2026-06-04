@@ -24,6 +24,8 @@ export const POPCAT = "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr";
 export const RETARDIO = "6ogzHhzdrQr9Pgv6hZ2MNze7UrzBMAFyBBWUYp1Fhitx";
 export const BILLY = "3B5wuUrMEi5yATD7on46hKfej3pfmd7t1RKgrsN3pump";
 export const HMTR = "7JhmUcZrrfhyt5nTSu3AfsrUq2L9992a7AhwdSDxdoL2";
+export const PUMP = "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn";
+export const CBBTC = "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij";
 
 export const ALL_SUPPORTED_TOKENS = [
   NATIVE_MINT.toString(),
@@ -49,10 +51,13 @@ export const ALL_SUPPORTED_TOKENS = [
   RETARDIO,
   BILLY,
   HMTR,
+  PUMP,
+  CBBTC,
 ];
 
-interface TokenInfo {
+export interface TokenInfo {
   ticker: string;
+  name?: string;
   decimals: number;
   isStableCoin?: boolean;
   isLST?: boolean;
@@ -67,21 +72,25 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
   },
   [NATIVE_MINT.toString()]: {
     ticker: "SOL",
+    name: "Solana",
     decimals: 9,
     isMajor: true,
   },
   [B_SOL]: {
     ticker: "bSOL",
+    name: "Blaze SOL",
     decimals: 9,
     isLST: true,
   },
   [M_SOL]: {
     ticker: "mSOL",
+    name: "Marinade SOL",
     decimals: 9,
     isLST: true,
   },
   [JITO_SOL]: {
     ticker: "JitoSOL",
+    name: "JITO SOL",
     decimals: 9,
     isLST: true,
   },
@@ -92,43 +101,52 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
   },
   [INF]: {
     ticker: "INF",
+    name: "Infinity",
     decimals: 9,
     isLST: true,
   },
   [H_SOL]: {
     ticker: "hSOL",
+    name: "Helius SOL",
     decimals: 9,
     isLST: true,
   },
   [JUP_SOL]: {
     ticker: "JupSOL",
+    name: "Jupiter SOL",
     decimals: 9,
     isLST: true,
   },
   [JUP]: {
     ticker: "JUP",
+    name: "Jupiter",
     decimals: 6,
   },
   [JTO]: {
     ticker: "JTO",
+    name: "Jito",
     decimals: 9,
   },
   [JLP]: {
     ticker: "JLP",
+    name: "Jupiter Liquidity Provider",
     decimals: 6,
   },
   [WBTC]: {
-    ticker: "wBTC",
+    ticker: "WBTC",
+    name: "Wrapped Bitcoin",
     decimals: 8,
     isMajor: true,
   },
   [WETH]: {
-    ticker: "wETH",
+    ticker: "WETH",
+    name: "Wrapped Ethereum",
     decimals: 8,
     isMajor: true,
   },
   [HNT]: {
     ticker: "HNT",
+    name: "Helium Network Token",
     decimals: 8,
   },
   [PYTH]: {
@@ -137,11 +155,13 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
   },
   [USDC]: {
     ticker: "USDC",
+    name: "USD Circle",
     decimals: 6,
     isStableCoin: true,
   },
   [USDT]: {
     ticker: "USDT",
+    name: "USD Tether",
     decimals: 6,
     isStableCoin: true,
   },
@@ -152,6 +172,7 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
   },
   [WIF]: {
     ticker: "WIF",
+    name: "Dog Wif Hat",
     decimals: 6,
     isMeme: true,
   },
@@ -172,7 +193,26 @@ export const TOKEN_INFO: { [key: string]: TokenInfo } = {
   },
   [HMTR]: {
     ticker: "HMTR",
+    name: "Hampter",
     decimals: 0,
     isMeme: true,
   },
+  [PUMP]: {
+    ticker: "PUMP",
+    name: "Pump.fun",
+    decimals: 6,
+  },
+  [CBBTC]: {
+    ticker: "CBBTC",
+    name: "Coinbase BTC",
+    decimals: 8,
+    isMajor: true,
+  },
+};
+
+export const MAJORS_PRIO = {
+  [WBTC]: 0,
+  [CBBTC]: 0,
+  [WETH]: 1,
+  [NATIVE_MINT.toString()]: 2,
 };

@@ -1,20 +1,5 @@
 import bs58 from "bs58";
 import {
-  AddressLookupTableInput,
-  Signer,
-  TransactionBuilder,
-  Umi,
-  WrappedInstruction,
-  publicKey,
-  transactionBuilder,
-} from "@metaplex-foundation/umi";
-import {
-  fromWeb3JsInstruction,
-  toWeb3JsPublicKey,
-  toWeb3JsTransaction,
-} from "@metaplex-foundation/umi-web3js-adapters";
-import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import {
   AddressLookupTableAccount,
   BlockhashWithExpiryBlockHeight,
   ComputeBudgetProgram,
@@ -32,36 +17,51 @@ import {
   createCloseAccountInstruction,
   createTransferInstruction,
 } from "@solana/spl-token";
+import {
+  AccountMeta,
+  AddressLookupTableInput,
+  Signer,
+  TransactionBuilder,
+  Umi,
+  WrappedInstruction,
+  publicKey,
+  transactionBuilder,
+} from "@metaplex-foundation/umi";
+import {
+  fromWeb3JsInstruction,
+  fromWeb3JsPublicKey,
+  toWeb3JsPublicKey,
+  toWeb3JsTransaction,
+} from "@metaplex-foundation/umi-web3js-adapters";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { PriorityFeeSetting, ProgramEnv, TransactionRunType } from "../types";
+import {
+  getLendingAccountEndFlashloanInstructionDataSerializer,
+  getLendingAccountStartFlashloanInstructionDataSerializer,
+} from "../externalSdks/marginfi";
 import { getTokenAccount } from "./accountUtils";
 import {
   arraysAreEqual,
   consoleLog,
+  customRpcCall,
   retryWithExponentialBackoff,
 } from "./generalUtils";
-import {
-  getLendingAccountEndFlashloanInstructionDataSerializer,
-  getLendingAccountStartFlashloanInstructionDataSerializer,
-} from "../marginfi-sdk";
-import { PriorityFeeSetting, TransactionRunType } from "../types";
-import { createDynamicSolautoProgram } from "./solauto";
-import { SOLAUTO_PROD_PROGRAM } from "../constants";
-
-export function buildHeliusApiUrl(heliusApiKey: string) {
-  return `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
-}
-
-export function buildIronforgeApiUrl(ironforgeApiKey: string) {
-  return `https://rpc.ironforge.network/mainnet?apiKey=${ironforgeApiKey}`;
-}
+import { createDynamicSolautoProgram } from "./solautoUtils";
+import { createDynamicMarginfiProgram } from "./marginfi";
+import { usePriorityFee } from "../services";
 
 export function getSolanaRpcConnection(
   rpcUrl: string,
-  programId: PublicKey = SOLAUTO_PROD_PROGRAM
+  programId?: PublicKey,
+  lpEnv?: ProgramEnv
 ): [Connection, Umi] {
-  const connection = new Connection(rpcUrl, "confirmed");
+  const connection = new Connection(rpcUrl, {
+    commitment: "confirmed",
+  });
   const umi = createUmi(connection).use({
     install(umi) {
       umi.programs.add(createDynamicSolautoProgram(programId), false);
+      umi.programs.add(createDynamicMarginfiProgram(lpEnv), false);
     },
   });
   return [connection, umi];
@@ -157,6 +157,34 @@ export function splTokenTransferUmiIx(
   );
 }
 
+export function getAccountMeta(
+  pubkey: PublicKey,
+  isSigner: boolean = false,
+  isWritable: boolean = false
+): AccountMeta {
+  return { pubkey: fromWeb3JsPublicKey(pubkey), isSigner, isWritable };
+}
+
+export async function getWalletSplBalances(
+  conn: Connection,
+  wallet: PublicKey,
+  tokenMints: PublicKey[]
+): Promise<bigint[]> {
+  return await Promise.all(
+    tokenMints.map(async (mint) => {
+      try {
+        const data = await conn.getTokenAccountBalance(
+          getTokenAccount(wallet, mint),
+          "confirmed"
+        );
+        return BigInt(data.value.amount);
+      } catch {
+        return 0n;
+      }
+    })
+  );
+}
+
 export async function getAddressLookupInputs(
   umi: Umi,
   lookupTableAddresses: string[]
@@ -181,33 +209,117 @@ export async function getAddressLookupInputs(
   }, new Array<AddressLookupTableInput>());
 }
 
+export function prependTx(
+  tx: TransactionBuilder,
+  txsToAdd: (TransactionBuilder | WrappedInstruction)[]
+) {
+  const instructions = tx.getInstructions();
+  const keccakIdx = instructions.findIndex(
+    (x) =>
+      x.programId.toString() === "KeccakSecp256k11111111111111111111111111111"
+  );
+  if (keccakIdx !== -1) {
+    const [beforeKeccak, afterKeccak] = tx.splitByIndex(keccakIdx + 1);
+    // IMPORTANT: Preserve lookup tables from original transaction
+    const lookupTables = tx.options.addressLookupTables ?? [];
+    let finalTx = transactionBuilder()
+      .setAddressLookupTables(lookupTables)
+      .add(beforeKeccak);
+    for (const txToAdd of txsToAdd) {
+      finalTx = finalTx.append(txToAdd);
+    }
+    return finalTx.add(afterKeccak);
+  } else {
+    let finalTx = tx;
+    for (const txToAdd of txsToAdd) {
+      finalTx = finalTx.prepend(txToAdd);
+    }
+    return finalTx;
+  }
+}
+
+const MAX_TX_SIZE = 1232;
+
+// Dummy blockhash for size checking (all zeros, 32 bytes base58 encoded)
+const DUMMY_BLOCKHASH = "11111111111111111111111111111111";
+
+/**
+ * Safely checks if a transaction can be serialized and returns its actual size.
+ * Returns undefined if serialization fails.
+ */
+export function getActualTxSize(
+  umi: Umi,
+  tx: TransactionBuilder
+): number | undefined {
+  try {
+    // Set a dummy blockhash if not already set, just for size checking
+    const txWithBlockhash = tx.setBlockhash(DUMMY_BLOCKHASH);
+    // Build the transaction and convert to web3.js format
+    const builtTx = txWithBlockhash.build(umi);
+    const web3Tx = toWeb3JsTransaction(builtTx);
+    // Actually serialize to get the real size
+    const serialized = web3Tx.serialize();
+    return serialized.length;
+  } catch (e) {
+    // Serialization failed - transaction is too large or malformed
+    return undefined;
+  }
+}
+
+/**
+ * Checks if a transaction can fit in a single transaction by actually serializing it.
+ * More accurate than getTransactionSize() estimation.
+ */
+export function canSerializeTransaction(
+  umi: Umi,
+  tx: TransactionBuilder,
+  buffer: number = 0
+): boolean {
+  const size = getActualTxSize(umi, tx);
+  if (size === undefined) {
+    return false;
+  }
+  return size + buffer <= MAX_TX_SIZE;
+}
+
 export function addTxOptimizations(
-  signer: Signer,
-  transaction: TransactionBuilder,
+  umi: Umi,
+  tx: TransactionBuilder,
   computeUnitPrice?: number,
   computeUnitLimit?: number
 ) {
-  return transaction
-    .prepend(
-      computeUnitPrice !== undefined
-        ? setComputeUnitPriceUmiIx(signer, computeUnitPrice)
-        : transactionBuilder()
-    )
-    .prepend(
-      computeUnitLimit
-        ? setComputeUnitLimitUmiIx(signer, computeUnitLimit)
-        : transactionBuilder()
-    );
+  const computePriceIx =
+    computeUnitPrice !== undefined
+      ? setComputeUnitPriceUmiIx(umi.identity, computeUnitPrice)
+      : transactionBuilder();
+  const computeLimitIx = computeUnitLimit
+    ? setComputeUnitLimitUmiIx(umi.identity, computeUnitLimit)
+    : transactionBuilder();
+
+  const allOptimizations = tx.prepend(computePriceIx).prepend(computeLimitIx);
+  const withCuPrice = tx.prepend(computePriceIx);
+  const withCuLimit = tx.prepend(computeLimitIx);
+
+  // Use actual serialization check instead of estimate
+  if (canSerializeTransaction(umi, allOptimizations)) {
+    return prependTx(tx, [computePriceIx, computeLimitIx]);
+  } else if (canSerializeTransaction(umi, withCuPrice)) {
+    return prependTx(tx, [computePriceIx]);
+  } else if (canSerializeTransaction(umi, withCuLimit)) {
+    return prependTx(tx, [computeLimitIx]);
+  } else {
+    return tx;
+  }
 }
 
 export function assembleFinalTransaction(
-  signer: Signer,
+  umi: Umi,
   transaction: TransactionBuilder,
   computeUnitPrice?: number,
   computeUnitLimit?: number
 ) {
   const tx = addTxOptimizations(
-    signer,
+    umi,
     transaction,
     computeUnitPrice,
     computeUnitLimit
@@ -286,6 +398,18 @@ async function simulateTransaction(
   return simulationResult;
 }
 
+export async function getQnComputeUnitPriceEstimate(
+  umi: Umi,
+  programId: PublicKey,
+  blockheight: number = 50
+): Promise<any> {
+  return await customRpcCall(umi, "qn_estimatePriorityFees", {
+    last_n_blocks: blockheight,
+    account: programId.toString(),
+    api_version: 2,
+  });
+}
+
 export async function getComputeUnitPriceEstimate(
   umi: Umi,
   tx: TransactionBuilder,
@@ -300,14 +424,25 @@ export async function getComputeUnitPriceEstimate(
     .getInstructions()
     .flatMap((x) => x.keys.flatMap((x) => x.pubkey.toString()));
 
-    let feeEstimate: number | undefined;
+  let feeEstimate: number | undefined;
+  try {
+    const resp = await customRpcCall(umi, "getPriorityFeeEstimate", [
+      {
+        transaction: !useAccounts
+          ? bs58.encode(web3Transaction.serialize())
+          : undefined,
+        accountKeys: useAccounts ? accountKeys : undefined,
+        options: {
+          priorityLevel: prioritySetting.toString(),
+        },
+      },
+    ]);
+    feeEstimate = Math.round((resp as any).priorityFeeEstimate as number);
+  } catch (e) {
     try {
-      const resp = await umi.rpc.call("getPriorityFeeEstimate", [
+      const resp = await customRpcCall(umi, "getPriorityFeeEstimate", [
         {
-          transaction: !useAccounts
-            ? bs58.encode(web3Transaction.serialize())
-            : undefined,
-          accountKeys: useAccounts ? accountKeys : undefined,
+          accountKeys,
           options: {
             priorityLevel: prioritySetting.toString(),
           },
@@ -315,20 +450,9 @@ export async function getComputeUnitPriceEstimate(
       ]);
       feeEstimate = Math.round((resp as any).priorityFeeEstimate as number);
     } catch (e) {
-      try {
-        const resp = await umi.rpc.call("getPriorityFeeEstimate", [
-          {
-            accountKeys,
-            options: {
-              priorityLevel: prioritySetting.toString(),
-            },
-          },
-        ]);
-        feeEstimate = Math.round((resp as any).priorityFeeEstimate as number);
-      } catch (e) {
-        // console.error(e);
-      }
+      // console.error(e);
     }
+  }
 
   return feeEstimate;
 }
@@ -339,29 +463,29 @@ async function spamSendTransactionUntilConfirmed(
   blockhash: BlockhashWithExpiryBlockHeight,
   spamInterval: number = 1500
 ): Promise<string> {
-  let transactionSignature: string | null = null;
+  let transactionSignature: string | undefined;
 
   const sendTx = async () => {
     try {
       const txSignature = await connection.sendRawTransaction(
         Buffer.from(transaction.serialize()),
-        { skipPreflight: true, maxRetries: 0 }
+        { skipPreflight: true, maxRetries: 3 }
       );
-      transactionSignature = txSignature;
+      if (!transactionSignature) {
+        transactionSignature = txSignature;
+      }
       consoleLog(`Transaction sent`);
-    } catch (error) {
-      consoleLog("Error sending transaction:", error);
-    }
+    } catch (e) {}
   };
-
-  await sendTx();
 
   const sendIntervalId = setInterval(async () => {
     await sendTx();
   }, spamInterval);
 
+  await new Promise((resolve) => setTimeout(resolve, spamInterval * 4));
+
   if (!transactionSignature) {
-    throw new Error("Failed to send");
+    throw new Error("No transaction signature found");
   }
 
   const resp = await connection
@@ -386,11 +510,16 @@ export async function sendSingleOptimizedTransaction(
   tx: TransactionBuilder,
   txType?: TransactionRunType,
   prioritySetting: PriorityFeeSetting = PriorityFeeSetting.Min,
-  onAwaitingSign?: () => void
+  onAwaitingSign?: () => void,
+  abortController?: AbortController
 ): Promise<Uint8Array | undefined> {
   consoleLog("Sending single optimized transaction...");
   consoleLog("Instructions: ", tx.getInstructions().length);
   consoleLog("Serialized transaction size: ", tx.getTransactionSize(umi));
+  consoleLog(
+    "Programs: ",
+    tx.getInstructions().map((x) => x.programId)
+  );
 
   const accounts = tx
     .getInstructions()
@@ -400,46 +529,43 @@ export async function sendSingleOptimizedTransaction(
     ]);
   consoleLog("Unique account locks: ", Array.from(new Set(accounts)).length);
 
-  const blockhash = await connection.getLatestBlockhash("confirmed");
+  const blockhash = await retryWithExponentialBackoff(
+    async () => await connection.getLatestBlockhash("confirmed")
+  );
 
-  let computeUnitLimit = undefined;
+  if (abortController?.signal.aborted) {
+    return;
+  }
+  let cuLimit = undefined;
   if (txType !== "skip-simulation") {
     const simulationResult = await retryWithExponentialBackoff(
       async () =>
         await simulateTransaction(
           umi,
           connection,
-          assembleFinalTransaction(
-            umi.identity,
-            tx,
-            undefined,
-            1_400_000
-          ).setBlockhash(blockhash)
+          assembleFinalTransaction(umi, tx, undefined, 1_400_000).setBlockhash(
+            blockhash
+          )
         ),
-      3
+      2
     );
-    computeUnitLimit = Math.round(simulationResult.value.unitsConsumed! * 1.15);
-    consoleLog("Compute unit limit: ", computeUnitLimit);
+    cuLimit = Math.round(simulationResult.value.unitsConsumed! * 1.15);
+    consoleLog("Compute unit limit: ", cuLimit);
   }
 
   let cuPrice: number | undefined;
-  if (prioritySetting !== PriorityFeeSetting.None) {
+  if (usePriorityFee(prioritySetting)) {
     cuPrice = await getComputeUnitPriceEstimate(umi, tx, prioritySetting);
-    if (!cuPrice) {
-      cuPrice = 1_000_000;
-    }
-    cuPrice = Math.min(cuPrice, 100 * 1_000_000);
+    cuPrice = Math.min(cuPrice ?? 0, 100_000_000);
     consoleLog("Compute unit price: ", cuPrice);
   }
 
+  if (abortController?.signal.aborted) {
+    return;
+  }
   if (txType !== "only-simulate") {
     onAwaitingSign?.();
-    const signedTx = await assembleFinalTransaction(
-      umi.identity,
-      tx,
-      cuPrice,
-      computeUnitLimit
-    )
+    const signedTx = await assembleFinalTransaction(umi, tx, cuPrice, cuLimit)
       .setBlockhash(blockhash)
       .buildAndSign(umi);
     const txSig = await spamSendTransactionUntilConfirmed(

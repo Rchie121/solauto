@@ -41,7 +41,7 @@ impl LendingAccountWithdraw {
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
             self.marginfi_group,
             false,
         ));
@@ -88,12 +88,12 @@ impl LendingAccountWithdraw {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-struct LendingAccountWithdrawInstructionData {
+pub struct LendingAccountWithdrawInstructionData {
     discriminator: [u8; 8],
 }
 
 impl LendingAccountWithdrawInstructionData {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             discriminator: [36, 72, 74, 19, 210, 210, 192, 192],
         }
@@ -111,7 +111,7 @@ pub struct LendingAccountWithdrawInstructionArgs {
 ///
 /// ### Accounts:
 ///
-///   0. `[]` marginfi_group
+///   0. `[writable]` marginfi_group
 ///   1. `[writable]` marginfi_account
 ///   2. `[signer]` signer
 ///   3. `[writable]` bank
@@ -345,7 +345,7 @@ impl<'a, 'b> LendingAccountWithdrawCpi<'a, 'b> {
         )],
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
             *self.marginfi_group.key,
             false,
         ));
@@ -395,7 +395,7 @@ impl<'a, 'b> LendingAccountWithdrawCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Box::new(Vec::with_capacity(8 + 1 + remaining_accounts.len()));
+        let mut account_infos = Vec::with_capacity(8 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.marginfi_group.clone());
         account_infos.push(self.marginfi_account.clone());
@@ -421,7 +421,7 @@ impl<'a, 'b> LendingAccountWithdrawCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[]` marginfi_group
+///   0. `[writable]` marginfi_group
 ///   1. `[writable]` marginfi_account
 ///   2. `[signer]` signer
 ///   3. `[writable]` bank

@@ -139,7 +139,7 @@ export function marginfiProtocolInteraction(
     },
     marginfiGroup: {
       index: 7,
-      isWritable: false as boolean,
+      isWritable: true as boolean,
       value: input.marginfiGroup ?? null,
     },
     marginfiAccount: {
